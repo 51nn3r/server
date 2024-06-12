@@ -1,25 +1,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <dirent.h>
 #include <sys/stat.h>
+#include <dirent.h>
 
 #include "files.h"
-#include "strings.c"
-
+#include "strings.h"
 
 typedef struct dirent dirent;
 
-typedef struct tree {
-    string *name;
-    int size;
-    int elementsCount;
-    struct tree *left;
-    struct tree *right;
-} tree_t;
+
+int getFileInfo(char *path) {
+    struct stat info;
+
+    stat(path, &info);
+    int mode = (int)info.st_mode;
+
+    return mode;
+}
 
 tree_t *Tree() {
-    tree_t *tree = malloc(sizeof(tree_t));
+    tree_t *tree = malloc(sizeof(*tree));
 
     tree->name = NULL;
     tree->size = 0;
@@ -28,28 +29,6 @@ tree_t *Tree() {
     tree->right = NULL;
 
     return tree;
-}
-
-typedef struct batch {
-    char *data;
-    size_t size;
-    struct batch *next;
-} batch_t;
-
-batch_t *Batch(size_t size) {
-    batch_t *batch = malloc(sizeof(batch_t));
-
-    batch->size = size;
-    batch->data = malloc(size);
-    batch->next = NULL;
-
-    return batch;
-}
-
-void *alloc(int size) {
-    void *ptr = malloc(size);
-    memset(ptr, 0x00, size);
-    return ptr;
 }
 
 void addNode(tree_t *node, string *name) {
@@ -110,28 +89,37 @@ string **treeToList(tree_t *tree) {
     return files;
 }
 
-
-batch_t *readFile(char *path) {
-    FILE *fd = fopen(path, "r");
-    if (!fd) {
-        return NULL;
+file_content_t *readFile(char *filename) {
+    FILE *file = fopen(filename, "rb");
+    if (file == NULL) {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
     }
 
-    batch_t *firstBatch = Batch(FILE_BATCH_SIZE);
-    batch_t *batch = firstBatch;
+    fseek(file, 0, SEEK_END);
+    size_t file_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
 
-    long long counter = 0;
-    while (fread(batch->data + (counter % FILE_BATCH_SIZE), 1, 1, fd) != 0) {
-        counter++;
-
-        if (counter % FILE_BATCH_SIZE == 0) {
-            batch->next = Batch(FILE_BATCH_SIZE);
-            batch = batch->next;
-        }
+    char *buffer = (char *)malloc(file_size);
+    if (buffer == NULL) {
+        perror("Error allocating memory");
+        fclose(file);
+        exit(EXIT_FAILURE);
     }
-    batch->size = counter % FILE_BATCH_SIZE;
 
-    fclose(fd);
+    size_t bytes_read = fread(buffer, 1, file_size, file);
+    if (bytes_read != file_size) {
+        perror("Error reading file");
+        fclose(file);
+        free(buffer);
+        exit(EXIT_FAILURE);
+    }
 
-    return firstBatch;
+    fclose(file);
+
+    file_content_t *fileContent = malloc(sizeof(*fileContent));
+    fileContent->data = buffer;
+    fileContent->size = file_size;
+
+    return fileContent;
 }

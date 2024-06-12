@@ -1,7 +1,5 @@
 #pragma once
 
-#include "server.h"
-
 #define RESPONSE_LINE_200 "HTTP/1.0 200 OK\r\n"
 #define RESPONSE_LINE_404 "HTTP/1.0 404 OK\r\n"
 
@@ -31,3 +29,5 @@
                         "<p>Error code: 404</p><p>Message: File not found.</p>"                                 \
                         "<p>Error code explanation: HTTPStatus.NOT_FOUND - Nothing matches the given URI.</p>"  \
                         "</body></html>"
+
+void handleRequest(int sock);

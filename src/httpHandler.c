@@ -3,17 +3,20 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <dirent.h>
+#include <sys/stat.h>
+
 #include <sys/socket.h>
 
 #include "httpHandler.h"
 #include "server.h"
-#include "files.c"
-#include "strings.c"
+#include "files.h"
+#include "strings.h"
 
 
 void readLine(int fd, char *buf, size_t limit) {
     char byte;
-    for (int offset = 0; offset < limit; offset++) {
+    for (size_t offset = 0; offset < limit; offset++) {
         read(fd, &byte, 1);
         if (byte == 0x00 || byte == '\n')
             return;
@@ -28,26 +31,28 @@ string *filterUri(char *uri) {
     int realLength = indexOf(strUri, String("?"));
 
     if (realLength == 0) {
-        delete(strUri);
+        del(strUri);
         return String("/");
     } else if (realLength > 0) {
         strUri = split(strUri, 0, realLength - 1);
     }
 
+    printf("%s\n", strUri->ptr);
     while (strUri->size > 1 && strUri->ptr[strUri->size - 1] == '/') {
-        strUri = split(strUri, 0, strUri->size - 2);
+        strUri = split(strUri, 0, strUri->size - 1);
     }
+    printf("%s\n", strUri->ptr);
 
     while (1) {
         int index = indexOf(strUri, String(".."));
-        if (index == -1)
+        if (index == -1) {
             break;
+        }
         strUri = split(strUri, 0, strUri->size - 3);
     }
 
-
     if (strUri->size == 0) {
-        delete(strUri);
+        del(strUri);
         return String("/");
     }
 
@@ -61,7 +66,7 @@ void sendDir(int sock, string *uri) {
     string **dirs = treeToList(dirsTree);
     string **files = treeToList(filesTree);
 
-    char *port = alloc(8);
+    char *port = calloc(8, 1);
     sprintf(port, "%d", PORT);
 
     string *response = String("");
@@ -101,8 +106,8 @@ void sendDir(int sock, string *uri) {
     merge(response, String(HTML_PART4));
 
     // Send headers
-    char *strInt = alloc(0x20);
-    sprintf(strInt, "%d", response->size);
+    char *strInt = calloc(0x20, 1);
+    sprintf(strInt, "%ld", response->size);
 
     string *headers = String("");
     merge(headers, String(RESPONSE_LINE_200));
@@ -117,18 +122,11 @@ void sendDir(int sock, string *uri) {
 }
 
 void sendFile(int sock, string *uri) {
-    size_t size = 0;
-
-    batch_t *firstBatch = readFile(uri->ptr);
-    batch_t *batch = firstBatch;
-    while (batch) {
-        size += batch->size;
-        batch = batch->next;
-    }
+    file_content_t *fileContent = readFile(uri->ptr);
 
     // Send headers
-    char *strInt = alloc(0x20);
-    sprintf(strInt, "%d", size);
+    char *strInt = calloc(0x20, 1);
+    sprintf(strInt, "%ld", fileContent->size);
 
     string *headers = String("");
     merge(headers, String(RESPONSE_LINE_200));
@@ -139,13 +137,8 @@ void sendFile(int sock, string *uri) {
     send(sock, headers->ptr, headers->size, 0);
 
     // Send response
-    batch = firstBatch;
-    while (batch) {
-        send(sock, batch->data, batch->size, 0);
-        batch_t *next = batch->next;
-        free(batch);
-        batch = next;
-    }
+    send(sock, fileContent->data, fileContent->size, 0);
+    free(fileContent);
 }
 
 void sendFileNoFound(int sock) {
@@ -153,8 +146,8 @@ void sendFileNoFound(int sock) {
     merge(response, String(FILE_NOT_FOUND));
 
     // Send headers
-    char *strInt = alloc(0x20);
-    sprintf(strInt, "%d", response->size);
+    char *strInt = calloc(0x20, 1);
+    sprintf(strInt, "%ld", response->size);
 
     string *headers = String("");
     merge(headers, String(RESPONSE_LINE_200));

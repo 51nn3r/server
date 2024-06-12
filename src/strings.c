@@ -1,37 +1,25 @@
-#pragma once
-
 #include <stdlib.h>
 #include <string.h>
 
 #include "strings.h"
 
 
-string *concat(string *s1, string *s2);
-
-string *split(string *str, int from, int to);
-
-static void delete(string *string) {
-    free(string->ptr);
-    free(string);
-}
-
 string *String(char *ptr) {
     size_t size = strlen(ptr);
 
     char *newPtr = malloc(size + 1);
+    memcpy(newPtr, ptr, size + 1);
 
-    memcpy(newPtr, ptr, size);
-    newPtr[size] = 0x00;
-
-    string *str = malloc(sizeof(string));
-
+    string *str = malloc(sizeof(*str));
     str->ptr = newPtr;
     str->size = size;
-    str->concat = (string (*)(struct string *, struct string *)) &concat;
-    str->split = (string (*)(struct string *, int, int)) &split;
-    str->delete = &delete;
 
     return str;
+}
+
+void del(string *string) {
+    free(string->ptr);
+    free(string);
 }
 
 string *concat(string *s1, string *s2) {
@@ -39,8 +27,7 @@ string *concat(string *s1, string *s2) {
     char *ptr = malloc(size + 1);
 
     memcpy(ptr, s1->ptr, s1->size);
-    memcpy(ptr + s1->size, s2->ptr, s2->size);
-    ptr[size] = 0x00;
+    memcpy(ptr + s1->size, s2->ptr, s2->size + 1);
 
     return String(ptr);
 }
@@ -50,11 +37,10 @@ string *merge(string *s1, string *s2) {
     char *ptr = malloc(size + 1);
 
     memcpy(ptr, s1->ptr, s1->size);
-    memcpy(ptr + s1->size, s2->ptr, s2->size);
-    ptr[size] = 0x00;
+    memcpy(ptr + s1->size, s2->ptr, s2->size + 1);
 
     free(s1->ptr);
-    delete(s2);
+    del(s2);
 
     s1->ptr = ptr;
     s1->size = size;
@@ -63,7 +49,7 @@ string *merge(string *s1, string *s2) {
 }
 
 string *split(string *str, int from, int to) {
-    size_t size = to - from + 1;
+    size_t size = to - from;
 
     if (from < 0 || to < 0 || from > to || size > str->size)
         return NULL;
@@ -83,7 +69,7 @@ string *split(string *str, int from, int to) {
 }
 
 int indexOf(string *str, string *seq) {
-    for (int i = 0; i < str->size; i++) {
+    for (size_t i = 0; i < str->size; i++) {
         if (str->size - i < seq->size) {
             return -1;
         }
